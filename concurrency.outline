@@ -1,0 +1,488 @@
+* Concurrent Programming in Clojure
+
+* Motivation
+
+- State of concurrent programming today
+  - Summary: Manual locking sucks
+
+- Multicore inevitable
+  - Power limitations
+  - Already here
+
+* Locks are broken
+
+- Too hard
+- No runtime enforcement
+- Deadlock and race conditions common
+
+* A Better Way
+
+- Default to immutability
+- Provide reasonable primitives for mutation
+- This is the Clojure approach
+
+* Clojure
+
+- A Lisp
+- Hosted on JVM (or CLR)
+- Dynamic
+- Functional (non-pure)
+- Immutable data structures
+- Built-in STM
+
+* Clojure Atomic Datatypes
+
+- int, float, string, etc.
+
+1
+1.3
+"blah blah"
+
+- rationals, big integers
+
+21/7
+123456789012344567
+
+- Keywords
+
+:foo
+:com.wangdera.com/namespaces/example:bar
+
+* Composite Datatypes
+
+- List
+
+(1 2 "three" 4.0)
+
+- Array
+
+[1 2 "three" 4.0]
+
+- Set
+
+#{1 2 "three" 4.0}
+
+- Map
+
+{:a 1, :b "two", :c 3.0}
+
+* Evaluation
+
+- Many things evaluate to themselves
+
+1 => 1
+[1 2 3] => [1 2 3]
+"blah" => "blah"
+
+- Lists apply first item as function to rest
+
+(+ 2 3 4 5 6) => 20
+(my-add 2 2) => 5
+(:a {:a 3, :b 4}) => 3
+
+- Quoting a list prevents evaluation
+
+'(1 2 3) => (1 2 3)
+
+- Interop deeply integrated
+
+(import '(java.util Date))
+
+(new Date)
+(Date.)
+
+(. (new Date) (toString))
+(.toString (new Date))
+
+* Clojure's Approach to Concurrency
+
+- Local Concurrency Only
+  - Distributed concurrency not addressed at language level
+  - But see Terracotta
+
+- Freeze the world so we can look at it
+  - Racewalk example
+
+* Immutability
+
+- Key to Clojure's approach to concurrency
+
+- All built-in datatypes immutable
+
+- Modification operations return new, immutable instance
+  - Like System.String in .NET
+
+(def foo {:a 1})
+(assoc foo :b 2) => {:a 1, :b 2}
+foo => {:a 1}
+
+- Sophisticated data sharing semantics to manage perf
+  - a.k.a. Persistent Data Structures
+
+* The Four Reference Types
+
+- Var:   Isolated changes within a thread
+- Atom:  Shared +  synchronous + autonomous
+- Agent: Shared + asynchronous + autonomous
+- Ref:   Shared +  synchronous + coordinated
+
+- Sharing: Can changes be seen by more than one thread?
+- Synchronicity: Does it happen now or some time later? 
+- Coordination: Do multiple changes happen atomically?
+
+* Vars, Threads, and Binding
+
+- Clojure binds values on a per-thread basis by default
+- Because values are immutable, many concurrency issues 
+  disappear
+- The "Bad Spock Universe" model
+- binding macro gives var new thread-local value
+- If no thread-local binding, root binding is used
+
+* Vars, Threads, and Binding
+
+(def foo {:name "Craig" :age 37.99})  ;; Root binding
+
+(defn print-foo 
+  ([] (print-foo ""))
+  ([prefix] (println prefix foo)))
+
+(binding [foo 3]
+  (print-foo))
+
+(print-foo)
+
+(import '(java.lang Thread))
+
+(defn with-new-thread [f] 
+  (.start (Thread. f)))
+
+(with-new-thread (fn [] (print-foo "thread:")))
+
+(do
+ (binding [foo "Keith"]
+   (with-new-thread (fn [] (print-foo "background : ")))
+   (print-foo "foreground1: "))
+ (print-foo "foreground2: "))
+	
+* Mutable References
+
+- Immutable values only get you so far
+- Need a level of indirection over a value. 
+- Use references to freeze world 
+- Look at it all day long via explicit dereference
+  - deref function or @ reader macro  
+- They are the only thing that mutate 
+  - Outside of Java interop
+  - (And transients)
+  - TODO: Learn more about transients
+
+* Atoms
+
+- Manage an independent value
+- State changes through swap! using ordinary function
+- Change occurs synchronously on called thread
+- Models compare-and-set (CAS) spin swap
+- Function may be called more than once
+- Guaranteed atomic transition
+  - Must avoid side-effects
+
+* Atoms
+
+(def foo (atom {:blah "this"}))
+
+@foo => {:blah "this"}
+
+;; Equivalently: (deref foo)
+
+(swap! foo (fn [a] 3))
+
+@foo => 3
+
+(swap! foo inc)
+
+@foo => 4
+
+(pmap 
+ (fn [_] (swap! foo inc)) 
+ (range 10000))
+
+@foo => 10004
+
+(def foo (atom 0))
+(def call-counter (atom 0))
+
+(import '(java.lang Thread))
+
+(defn slow-inc-with-call-count [x] 
+  (swap! call-counter inc)
+  (Thread/sleep 100)
+  (inc x))
+
+(pmap 
+ (fn [_] (swap! foo slow-inc-with-call-count)) 
+ (range 100))
+
+@call-counter => some number greater than 100
+
+* Agents
+
+- Manage an independent value
+- Changes through ordinary function executed asynchronously
+- They do compose with transactions, allowing for deferred side effects
+- Not actors: not distributed
+
+* Agents
+
+(def my-agent (agent {:name "craig-andera" :favorites []}))
+
+@my-agent => {:name "craig-andera" :favorites []}
+
+(defn slow-append-favorite [val new-fav] 
+  (Thread/sleep 2000)
+  (assoc val :favorites (cons new-fav (:favorites val))))
+
+(do (send my-agent slow-append-favorite "food")
+    (println @my-agent)
+  (Thread/sleep 2000)
+  (println @my-agent))
+
+@my-agent => {:name "craig-andera" :favorites ("food")}
+
+* Agents, Watchers, and Errors
+
+TODO
+
+* Refs
+
+- Allow for synchronous changes to shared state
+- Refs can only be changed within a transaction
+- Software Transactional Memory (STM) system
+- Retries are automatic
+- Therefore, there should be no side effects
+
+* Refs
+
+(def foo (ref {:first "Craig" :last "Andera" :children 1}))
+
+@foo => {:first "Craig" :last "Andera" :children 1}
+
+;; Creates a new value
+(assoc @foo :blog "http://pluralsight.com/craig")
+=>  {:first "Craig" 
+     :last "Andera" 
+     :children 1 
+     :blog "http://pluralsight.com/craig"}
+
+;; Note: no change
+@foo => {:first "Craig" :last "Andera" :children 1}
+
+(commute foo assoc :blog "http://pluralsight.com/craig")
+=> IllegalStateException: no transaction running
+
+(dosync 
+ (alter foo assoc :blog "http://pluralsight.com/craig"))
+(dosync 
+ (commute foo assoc :blog "http://pluralsight.com/craig"))
+
+* A Little Support Code 
+
+(import '(java.lang Thread))
+
+(defmacro with-new-thread [& body]
+  `(.start (Thread. (fn [] ~@body))))
+
+(comment (macroexpand-1 '(with-new-thread (print-foo))))
+
+(def r (ref 0))
+
+* Concurrent Writes
+
+(dosync (ref-set r 0))
+
+;; WRONG WRONG WRONG!
+;; (dosync (ref-set r (inc @r)))
+
+(with-new-thread
+  (dosync 
+   (println "tx1 initial")
+   (alter r inc)
+   (println "tx1 final:" @r)
+   (Thread/sleep 5000)
+   (println "tx1 done")))
+
+(with-new-thread
+  (dosync
+   (println "tx2 initial:" @r)
+   (Thread/sleep 1000)
+   (alter r inc)
+   (println "tx2 final:" @r)
+   (println "tx2 done")))
+
+* Reading Refs Absent a Transaction
+
+(with-new-thread
+  (dotimes [_ 10]
+    (Thread/sleep 1000)
+    (dosync (alter r inc))
+    (println "updated ref to" @r)))
+
+(with-new-thread
+  (dotimes [_ 7]
+    (println "ref is" @r)
+    (Thread/sleep 1000)))
+
+* Reading Refs Inside a Transaction 
+
+(with-new-thread
+  (dotimes [_ 10]
+    (Thread/sleep 1000)
+    (dosync (alter r inc))
+    (println "updated ref1 to" @r)))
+
+(with-new-thread
+  (println "ref outside of tx is" @r)
+  (dosync 
+   (let [r1init @r]
+    (dotimes [_ 7]
+      (if (not (= r1init @r))
+	(println "ref1 has changed")
+	(println "ref1 has not changed"))
+      (Thread/sleep 1000))))
+  (println "ref outside of tx is" @r))
+
+
+* Consistency of Read Against Multiple Refs
+
+(def r1 (ref 0))
+(def r2 (ref 0))
+
+(with-new-thread
+  (dotimes [_ 10]
+    (Thread/sleep 1000)
+    (dosync 
+     (alter r1 inc)
+     (alter r2 inc)
+     (Thread/sleep 500))
+    (println "updated ref1/2 to" @r1)))
+
+(with-new-thread
+  (dotimes [_ 10]
+   (dosync 
+    (let [r1-value @r1] 
+      (println "read ref1")
+      (Thread/sleep 1500)
+      (let [r2-value @r2] 
+	(println "read ref2")
+	(println "r1 is" r1-value "r2 is" r2-value)
+	(Thread/sleep 1000))))))
+
+
+* The io! Macro
+
+- Use it to prevent running in a transaction
+
+clojure.core/io!
+([& body])
+Macro
+  If an io! block occurs in a transaction, throws an
+  IllegalStateException, else runs body in an implicit do.
+  If the first expression in body is a literal string, 
+  will use that as the exception message.
+
+* Uniform state transition
+
+- Refs
+
+(dosync (commute foo assoc :a "a"))
+
+- Agents
+
+(send foo assoc :a "a")
+
+- Atoms
+
+(swap! foo assoc :a "a")
+
+* Uniform state transition model
+
+- (<change-state-ops> reference function [args*])
+- Function passed current state of reference plus args
+- Return value of function is next state of reference
+- Clojure swaps ref only
+- deref always gives current state
+- No user locking, no deadlocks
+- Readers not blocked
+- Writers not blocked by other readers
+
+* Futures
+
+TODO
+
+* Promises
+
+TODO
+
+
+* End!
+
+* Misc
+** Non-atomic copies of longs (bad)
+** My experience with web services: immutability good
+** What happens if there are two writes? Last writer win? 
+** What is the difference between alter and commute? 
+
+* The Stash
+
+** Why Functional?
+
+Makes a ton of sense because side effects kill retries, 
+without which it becomes difficult to implement concurrency
+without resorting to locking. 
+
+** Why Not Purely Functional? 
+
+Because it's nice to have enough rope to hang yourself.  
+
+** Racewalk Example
+
+Looking at the world while it's changing doesn't work. 
+
+Racewalk example: 
+
+1. Look at left foot
+2. Look at right foot
+3. If both off the ground: foul
+
+Bzzzt. Wrong. 
+
+Obviously, the world itself can't stop. But we can 
+take a picture of it and look at the picture. 
+
+** Destructuring bind
+
+;; For maps
+(def craig {:name "craig" :age 37})
+(let [{name :name} craig] name) => "craig"
+
+;; For vectors
+(def v [1 2 3 4 5])
+(let [[x y & zs] v] (str x ", " y ", " zs))
+  => "1, 2, (3, 4, 5)"
+
+** Transients
+
+(doc transient) => 
+-------------------------
+clojure.core/transient
+([coll])
+  Returns a new, transient version of the collection, in constant time.
+
+TODO: How does this work again? 
+
+** Settings
+lucida-sans-typewriter 12
+hide toolbar
+hide menu bar
+59x23
+
