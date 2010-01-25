@@ -175,7 +175,6 @@ foo => {:a 1}
 - They are the only thing that mutate 
   - Outside of Java interop
   - (And transients)
-  - TODO: Learn more about transients
 
 * Atoms
 
@@ -249,7 +248,7 @@ foo => {:a 1}
 
 @my-agent => {:name "craig-andera" :favorites ("food")}
 
-* Agents, Watchers, and Errors
+* Agents and Errors
 
 TODO
 
@@ -390,6 +389,47 @@ Macro
   If the first expression in body is a literal string, 
   will use that as the exception message.
 
+* Validators
+
+- Functions that are called whenever value might change
+- Can add validators to agents, atoms, refs, and vars
+- Accepts one argument: intended new value
+- Exception or false rejects new value
+- Rejected value means exception and new value not set
+
+* Validators
+
+(def thingy 17)
+(set-validator! (var thingy) #(not (= %1 16)))
+
+(binding [thingy 20] (println thingy))
+(binding [thingy 16] (println thingy))
+
+(set-validator! (var thingy) nil) ;; Clears it
+
+* Watchers
+
+- Functions that are called whenever value might change
+- Can add watchers to agents, atoms, and refs
+- Four args: a key, a ref, old value, and new value
+- Added with add-watch, removed with remove-watch
+
+* Watchers
+
+(def my-watcher [key r old new]
+     (println key r old new))
+
+(def foo (atom 3))
+
+(add-watch foo :my-key my-watcher)
+
+(swap! foo inc)
+
+=> :my-key #<Atom@bbd83d: 4> 3
+4
+
+(remove-watch foo :my-key)
+
 * Uniform state transition
 
 - Refs
@@ -478,7 +518,11 @@ clojure.core/transient
 ([coll])
   Returns a new, transient version of the collection, in constant time.
 
-TODO: How does this work again? 
+- Transients are mutable
+- But only through parallel functions (e.g. conj!)
+- Cannot be shared across threads
+- Will throw when used with modification function like assoc
+- Can be turned back with persistent!	 
 
 ** Settings
 lucida-sans-typewriter 12
