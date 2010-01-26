@@ -484,7 +484,21 @@ Macro
 
 * Futures
 
-TODO
+- A simple primitive for forking work
+- Implements same dereference (@) semantics as atoms, etc.
+- Dereference blocks until work completes
+- Built internally on agent framework
+
+* Futures
+
+(def my-future 
+     (future 
+       (Thread/sleep 5000)
+       (println "Doing stuff")
+       (Thread/sleep 3000)
+       17))
+
+@my-future ;; 17, some time later
 
 * Promises
 
