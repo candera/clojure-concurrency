@@ -485,7 +485,7 @@ Macro
 * Futures
 
 - A simple primitive for forking work
-- Implements same dereference (@) semantics as atoms, etc.
+- Implements same deref/@ semantics as atoms, etc.
 - Dereference blocks until work completes
 - Built internally on agent framework
 
@@ -502,8 +502,42 @@ Macro
 
 * Promises
 
-TODO
+- A simple primitive for handing around values
+- Implements same deref/@ semantics as atoms, etc.
+- Create via promise
+- Value delivered exactly once via deliver function
+- Deref blocks until value delivered
+- Beware deadlock!
 
+* Promises
+
+(def my-promise (promise))
+
+(with-new-thread 
+  (println "Waiting for promise to be delivered...")
+  (println "Delivered: " @my-promise))
+
+(deliver my-promise 42)
+
+@my-promise ;; 42
+
+(deliver my-promise 17) ; Exception
+
+;; Deadlock possible
+
+(def promise1 (promise))
+
+(def promise2 (promise))
+
+(with-new-thread 
+  (println "Waiting for promise2: ") 
+  (println @promise2)
+  (deliver promise1 1))
+
+(with-new-thread
+  (println "Waiting for promise1: ") 
+  (println @promise1)
+  (deliver promise2 2))
 
 * End!
 
