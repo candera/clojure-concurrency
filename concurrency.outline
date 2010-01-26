@@ -1,5 +1,10 @@
 * Concurrent Programming in Clojure
 
+Craig Andera
+candera@wangdera.com
+
+Presentation and code at http://github.com/candera
+
 * Motivation
 
 - State of concurrent programming today
@@ -119,7 +124,7 @@ foo => {:a 1}
 - Sophisticated data sharing semantics to manage perf
   - a.k.a. Persistent Data Structures
 
-* The Four Reference Types
+* The Four (Basic) Reference Types
 
 - Var:   Isolated changes within a thread
 - Atom:  Shared +  synchronous + autonomous
