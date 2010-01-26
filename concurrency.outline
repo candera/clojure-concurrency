@@ -230,6 +230,7 @@ foo => {:a 1}
 - Changes through ordinary function executed asynchronously
 - They do compose with transactions, allowing for deferred side effects
 - Not actors: not distributed
+- Use send or send-off to dispatch
 
 * Agents
 
@@ -250,7 +251,33 @@ foo => {:a 1}
 
 * Agents and Errors
 
-TODO
+- Exceptions in agents causes agent to enter error state
+- Interactions with agents in this state cause exception
+- Errors can be examined with agent-errors
+- Errors can be cleared with clear-agent-errors
+
+* Agents and Errors
+
+(def erroring-agent (agent 3))
+
+(defn modify-agent-with-error [current new]
+  (if (= 42 new)
+    (throw (Exception. "Anything but 42!"))
+    new))
+
+(send erroring-agent modify-agent-with-error 10)
+
+@erroring-agent ;; 10
+
+(send erroring-agent modify-agent-with-error 42)
+
+@erroring-agent ;; Agent has errors
+
+(agent-errors erroring-agent) ;; Exceptions
+
+(clear-agent-errors erroring-agent)
+
+@erroring-agent ;; 10
 
 * Refs
 
