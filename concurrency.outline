@@ -178,7 +178,7 @@ foo => {:a 1}
 - Use references to freeze world 
 - Look at it all day long via explicit dereference
   - deref function or @ reader macro  
-- They are the only thing that mutate 
+- They are the only things that mutate 
   - Outside of Java interop
   - (And transients)
 
@@ -234,7 +234,6 @@ foo => {:a 1}
 
 - Manage an independent value
 - Changes through ordinary function executed asynchronously
-- They do compose with transactions, allowing for deferred side effects
 - Not actors: not distributed
 - Use send or send-off to dispatch
 
@@ -248,8 +247,9 @@ foo => {:a 1}
   (Thread/sleep 2000)
   (assoc val :favorites (cons new-fav (:favorites val))))
 
-(do (send my-agent slow-append-favorite "food")
-    (println @my-agent)
+(do 
+  (send my-agent slow-append-favorite "food")
+  (println @my-agent)
   (Thread/sleep 2000)
   (println @my-agent))
 
@@ -292,6 +292,7 @@ foo => {:a 1}
 - Software Transactional Memory (STM) system
 - Retries are automatic
 - Therefore, there should be no side effects
+- They do compose with agents, allowing for deferred side effects
 
 * Refs
 
@@ -337,7 +338,7 @@ foo => {:a 1}
 
 (with-new-thread
   (dosync 
-   (println "tx1 initial")
+   (println "tx1 initial:" @r)
    (alter r inc)
    (println "tx1 final:" @r)
    (Thread/sleep 5000)
@@ -370,18 +371,21 @@ foo => {:a 1}
   (dotimes [_ 10]
     (Thread/sleep 1000)
     (dosync (alter r inc))
-    (println "updated ref1 to" @r)))
+    (println "updated r to" @r)))
 
 (with-new-thread
-  (println "ref outside of tx is" @r)
+  (println "r outside tx is" @r)
   (dosync 
-   (let [r1init @r]
-    (dotimes [_ 7]
-      (if (not (= r1init @r))
-	(println "ref1 has changed")
-	(println "ref1 has not changed"))
+   (let [rinit @r]
+    (dotimes [i 7]
+      (print "r inside tx is" @r)
+      (println " (iter" i "r"
+	       (if (= rinit @r)
+		 "not"
+		 "")
+       "changed from" rinit ")")
       (Thread/sleep 1000))))
-  (println "ref outside of tx is" @r))
+  (println "r outside tx is" @r))
 
 
 * Consistency of Read Against Multiple Refs
