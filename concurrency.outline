@@ -520,7 +520,8 @@ Macro
 - Create via promise
 - Value delivered exactly once via deliver function
 - Deref blocks until value delivered
-- Beware deadlock!
+- Can deadlock!
+- But if deadlock can happen, will always happen
 
 * Promises
 
