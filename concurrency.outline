@@ -46,7 +46,7 @@ Presentation at http://github.com/candera
 
 - rationals, big integers
 
-21/7
+22/7
 123456789012344567
 
 - Keywords
@@ -58,7 +58,7 @@ Presentation at http://github.com/candera
 
 - List
 
-(1 2 "three" 4.0)
+(1, 2, "three", 4.0)
 
 - Array
 
@@ -85,6 +85,8 @@ Presentation at http://github.com/candera
 (+ 2 3 4 5 6) => 20
 (my-add 2 2) => 5
 (:a {:a 3, :b 4}) => 3
+({:a 3 :b 4} :b) => 4
+([1 2 3 4] 2) => 3
 
 - Quoting a list prevents evaluation
 
@@ -97,8 +99,10 @@ Presentation at http://github.com/candera
 (new Date)
 (Date.)
 
-(. (new Date) (toString))
+(. (new Date) (toString 1 2 3)) new Date().toString(1 2 3)
 (.toString (new Date))
+(.toString Date. 1 2 3)
+(Thread/sleep 500)
 
 * Clojure's Approach to Concurrency
 
@@ -453,7 +457,7 @@ Macro
 
 * Watchers
 
-(def my-watcher [key r old new]
+(defn my-watcher [key r old new]
      (println key r old new))
 
 (def foo (atom 3))
@@ -509,7 +513,6 @@ Macro
        17))
 
 @my-future ;; 17, some time later
-
 * Promises
 
 - A simple primitive for handing around values
